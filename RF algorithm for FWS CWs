@@ -1,0 +1,130 @@
+# an example of random forest model for the modeling and prediction of hydraulic performance of FWS CWs based on constructed dataset
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import train_test_split
+from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import RandomizedSearchCV
+
+from sklearn.metrics import mean_absolute_error
+from sklearn.metrics import mean_squared_error
+from sklearn.metrics import explained_variance_score
+from sklearn.metrics import r2_score
+
+import numpy as np
+import pandas as pd
+import csv
+
+import matplotlib.pyplot as plt
+from sklearn.inspection import partial_dependence
+from sklearn.inspection import plot_partial_dependence
+
+with open('trainingset.csv','r') as csvfile:      # import training set
+    reader = csv.reader(csvfile)
+    rows = [row for row in reader]
+    
+X = list()
+e = list()
+nameta = list()
+nametatp = list()
+MI = list() 
+fi10 = list()
+MDI = list()
+for i in range(1,len(rows)):
+    rows[i]= list(map(float,rows[i]))  
+    X.append(rows[i][0:3])
+    e.append(rows[i][3])
+    nameta.append(rows[i][4])
+    nametatp.append(rows[i][5])
+    MI.append(rows[i][6])
+    fi10.append(rows[i][7])
+    MDI.append(rows[i][8])
+    
+dataset =[fi10, MDI, nameta, MI,e]
+index = 0                 # short-circuit index is taken as an example to demonstrate the establishment process of RF model
+xtrain,xtest,ytrain,ytest = train_test_split(X,dataset[index],test_size=0.2,random_state= 5)  #data set partitioning based on 5-fold cross validation
+
+def MARE(ytest,ypredict):
+    len_test = len(ytest)
+    mare = []
+    for i in range(len_test):
+        submare = np.abs((ypredict[i]-ytest[i])/ytest[i])
+#         print(submare)
+        mare.append(submare)
+    return np.mean(mare)
+    
+# fi10
+rfr = RandomForestRegressor(bootstrap=True, max_depth=13, min_samples_split= 2, min_samples_leaf=1, n_estimators=152, random_state=156)
+rfr.fit(xtrain,ytrain)
+r2_score(ytest,rfr.predict(xtest))
+
+# training evaluation divided from training set
+rfr_R2_train = r2_score(ytrain,rfr.predict(xtrain))
+rfr_rmse_train = np.sqrt(mean_squared_error(ytrain,rfr.predict(xtrain)))
+rfr_mae_train = mean_absolute_error(ytrain,rfr.predict(xtrain))
+rfr_mare_train = MARE(ytrain,rfr.predict(xtrain))
+
+# validation evaluation divided from training set 
+rfr_R2_test = r2_score(ytest,rfr.predict(xtest))
+rfr_rmse_test = np.sqrt(mean_squared_error(ytest,rfr.predict(xtest)))
+rfr_mae_test = mean_absolute_error(ytest,rfr.predict(xtest))
+rfr_mare_test = MARE(ytest,rfr.predict(xtest))
+
+# the importance of different design parameters based on feature importance analysis of RF
+rfr_import = rfr.feature_importances_
+print('importance：',rfr_import)
+x_columns = ['Aspect ratio','Water depth','Hydraulic loading rate']
+indices = np.argsort(rfr_import)[::-1]
+for f in range(len(X[0])):
+    print("%2d) %-*s %f" % (f+1,30,x_columns[indices[f]],rfr_import[indices[f]]))
+x_columns1 = [x_columns[i] for i in indices]
+for i in range(len(x_columns)):
+    plt.bar(i,rfr_import[indices[i]],color='orange',align = 'center')    
+    plt.xticks(np.arange(len(x_columns)),x_columns1,fontsize=10)
+    plt.tick_params(labelcolor = 'black',labelsize = 15)
+plt.show()    
+
+# test set
+import xlrd    
+reader = xlrd.open_workbook('test and extension.xls')
+table = reader.sheets()[0]      # [0,1]  0:test set； 1：extension set.
+nrows = table.nrows
+XXtest = []
+for i in range(3,nrows):
+    row = table.row_values(i)
+    XXtest.append(row[1:4])    
+RFtest = rfr.predict(XXtest)   # the hydraulic index calculated by RF based on the combination of design parameter of test set
+
+# Evaluation on test set
+i= index  # 0 fi10, 1 MDI, 2 nameta, 3 MI
+testdata = [[0.275,0.255,0.247,0.244,0.248] ]
+rfr_R2_test = r2_score(testdata[i],RFtest)
+rfr_rmse_test = np.sqrt(mean_squared_error(testdata[i],RFtest))
+rfr_mae_test = mean_absolute_error(testdata[i],RFtest)
+rfr_mare_test = MARE(testdata[i],RFtest)
+print(rfr_R2_test)
+print(rfr_rmse_test)
+print(rfr_mae_test)
+print(rfr_mare_test)
+
+# Extension set
+import xlrd    
+reader = xlrd.open_workbook('test and extension.xls')
+table = reader.sheets()[1]      # [0,1]  0: test set； 1：extension set.
+nrows = table.nrows
+XXtest = []
+for i in range(3,nrows):
+    row = table.row_values(i)
+    XXtest.append(row[1:4])    
+RFtest = rfr.predict(XXtest)    # the hydraulic index calculated by RF based on the combination of design parameter of extension set
+ 
+# Evaluation on extension set
+i = index     # 0 fi10, 1 MDI, 2 nameta, 3 MI
+expanddata = [[0.2250, 0.1690, 0.1670, 0.1960]]
+rfr_R2_expand = r2_score(expanddata[i],RFtest)
+rfr_rmse_expand = np.sqrt(mean_squared_error(expanddata[i],RFtest))
+rfr_mae_expand = mean_absolute_error(expanddata[i],RFtest)
+rfr_mare_expand = MARE(expanddata[i],RFtest)
+print(rfr_R2_expand)
+print(rfr_rmse_expand)
+print(rfr_mae_expand)
+print(rfr_mare_expand)
