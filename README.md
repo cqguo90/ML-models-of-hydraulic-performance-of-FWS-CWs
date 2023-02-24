@@ -7,4 +7,4 @@ Here, based on the limited field test data, a numerical model of hydrodynamics o
 
 In order to keep the authors working, we only put a few index values in different data files so that the model can run. Similarly, only one ML model is put in here to demonstrate the processing flow, and the other ML models are processed similarly. The model training precedure used to obtain the hyperparameters is omitted here.
 
-More detailed description can refer to the article published in the journal <<Journal of Environmental Management>>.
+More detailed description can refer to the article published in the journal <Journal of Environmental Management>.
